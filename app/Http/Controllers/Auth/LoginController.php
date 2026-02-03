@@ -27,13 +27,18 @@ class LoginController extends Controller
                 return redirect('/admin/dashboard');
             }
 
-            return redirect('/guru/dashboard');
+         if (auth()->user()->role === 'guru') {
+                return redirect('/guru/dashboard');
+            }
+
+            return redirect('/login');
         }
 
         return back()->withErrors([
-            'email' => 'Email atau password salah.',
+            'email' => 'Login gagal',
         ]);
     }
+
 
     public function logout(Request $request)
     {

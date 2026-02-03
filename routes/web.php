@@ -1,64 +1,97 @@
 <?php
 
 use Illuminate\Support\Facades\Route;
-use App\Http\Controllers\Auth\LoginController;
-use App\Http\Controllers\Admin\QrController;
-use App\Http\Controllers\AttendanceController;
-use App\Models\QrToken;
 use Illuminate\Support\Str;
 use Carbon\Carbon;
-use Illuminate\Support\Facades\Auth;
+
+use App\Models\QrToken;
+use App\Http\Controllers\Auth\LoginController;
+use App\Http\Controllers\Admin\AttendanceRecapController;
+use App\Http\Controllers\AttendanceController;
+
+/*
+|--------------------------------------------------------------------------
+| PUBLIC
+|--------------------------------------------------------------------------
+*/
 
 Route::get('/', function () {
-    return view('welcome');
+    if (auth()->check()) {
+        return auth()->user()->role === 'admin'
+            ? redirect('/admin/dashboard')
+            : redirect('/guru/dashboard');
+    }
+
+    return redirect('/login');
 });
 
+
+/*
+|--------------------------------------------------------------------------
+| AUTH
+|--------------------------------------------------------------------------
+*/
 Route::get('/login', [LoginController::class, 'showLogin'])->name('login');
 Route::post('/login', [LoginController::class, 'login']);
-Route::post('/logout', [LoginController::class, 'logout']);
+Route::post('/logout', [LoginController::class, 'logout'])->name('logout');
 
+/*
+|--------------------------------------------------------------------------
+| ADMIN
+|--------------------------------------------------------------------------
+*/
 Route::middleware(['auth', 'role:admin'])->group(function () {
-    Route::get('/admin/dashboard', function () {
-        return view('admin.dashboard');
-    });
+
+    Route::get('/admin/dashboard', fn () => view('admin.dashboard'));
+
+    // Generate QR harian
     Route::get('/admin/qr', function () {
-    $today = Carbon::today();
-    $qr = QrToken::firstOrCreate(
-        ['tanggal' => $today],
-        ['token' => Str::random(40)]
-    );
-    return view('admin.qr', compact('qr'));
+        $today = Carbon::today();
+
+        $qr = QrToken::firstOrCreate(
+            ['tanggal' => $today],
+            ['token' => Str::random(40)]
+        );
+
+        return view('admin.qr', compact('qr'));
     })->name('admin.qr');
 
+    Route::get('/admin/rekap', [AttendanceRecapController::class, 'index'])
+        ->name('admin.rekap');
 });
 
+/*
+|--------------------------------------------------------------------------
+| QR SCAN (PUBLIC ENTRY)
+|--------------------------------------------------------------------------
+*/
+Route::get('/absen/{token}', [AttendanceController::class, 'scan'])
+    ->name('absen.scan');
+
+/*
+|--------------------------------------------------------------------------
+| GURU (LOGIN BIASA)
+|--------------------------------------------------------------------------
+*/
 Route::middleware(['auth', 'role:guru'])->group(function () {
-    Route::get('/guru/dashboard', function () {
-        return view('guru.dashboard');
-    });
+
+    Route::get('/guru/dashboard', [AttendanceController::class, 'dashboard'])
+    ->name('guru.dashboard')
+    ->middleware(['auth', 'role:guru']);
 
     Route::get('/guru/absensi', [AttendanceController::class, 'index'])
         ->name('guru.absensi');
 
-    Route::get('/guru/riwayat', [\App\Http\Controllers\AttendanceController::class, 'riwayat'])
+    Route::get('/guru/riwayat', [AttendanceController::class, 'riwayat'])
         ->name('guru.riwayat');
-});
 
-Route::get('/absen/{token}', [AttendanceController::class, 'scan']);
-Route::post('/absen', [AttendanceController::class, 'store'])
-    ->middleware(['auth', 'role:guru']);
+    // FORM ABSENSI (GET)
+    Route::get('/absen', [AttendanceController::class, 'index'])
+        ->name('absen.form');
 
-Route::middleware(['auth', 'role:guru'])->group(function () {
-
-    Route::get('/absen', function () {
-        if (!auth()->check()) {
-            return redirect('/login');
-        }
-        return view('absen.form');
-    })->name('absen');
-
-
+    // SIMPAN ABSENSI (POST)
     Route::post('/absen', [AttendanceController::class, 'store'])
-    ->middleware(['auth', 'role:guru']);
-
+        ->name('absen.store');
 });
+
+

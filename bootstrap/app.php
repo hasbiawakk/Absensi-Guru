@@ -14,7 +14,10 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withMiddleware(function (Middleware $middleware) {
         $middleware->alias([
             'role' => RoleMiddleware::class,
+            'valid.qr' => \App\Http\Middleware\ValidQr::class,
+            'guru.token'=> \App\Http\Middleware\GuruToken::class,
         ]);
+        
     })
 
     ->withExceptions(function (Exceptions $exceptions): void {
